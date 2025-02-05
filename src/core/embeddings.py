@@ -1,15 +1,15 @@
 """Vector embeddings and database functionality."""
 
 import logging
+import textwrap
+from pathlib import Path
 from typing import List
 
+import plotly.graph_objects as go
+import umap.umap_ as umap
+from document import DocumentProcessor
 from langchain_community.vectorstores import Chroma
 from langchain_ollama import OllamaEmbeddings
-import umap.umap_ as umap
-from pathlib import Path
-from document import DocumentProcessor
-import plotly.graph_objects as go
-import textwrap
 
 logger = logging.getLogger(__name__)
 
@@ -49,32 +49,15 @@ class VectorStore:
                 raise
 
 
-if __name__ == "__main__":
-    # 1. Load & split documents
-    processor = DocumentProcessor()
-    pdf_path = Path("../../data/pdfs/sample/cv.pdf")
-    documents = processor.load_pdf(pdf_path)
-    chunks = processor.split_documents(documents)
-
-    # 2. Create vector DB and get chunk embeddings
-    vector_store = VectorStore()
-    vector_db = vector_store.create_vector_db(
-        documents=chunks, collection_name="local-rag"
-    )
-
-    embeddings_obj = vector_db._collection.get(include=["embeddings"])
-    chunk_embeddings = embeddings_obj["embeddings"]
-
-    # Extract the raw text from each chunk
-    texts = [chunk.page_content for chunk in chunks]
-
-    # 3. Reduce chunk embeddings from high-D to 3D using UMAP
+def plot_embeddings(
+    chunk_embeddings: List, texts: List, query_embedding: List, user_query: str
+) -> None:
+    """Plot text embeddings in 3D space with user query."""
     reducer = umap.UMAP(n_components=3)
     chunk_embeddings_3d = reducer.fit_transform(chunk_embeddings)
 
     wrapped_texts = ["<br>".join(textwrap.wrap(txt, width=80)) for txt in texts]
 
-    # 5. Create the figure and add chunk embeddings as scatter points (blue)
     fig = go.Figure()
     fig.add_trace(
         go.Scatter3d(
@@ -89,14 +72,8 @@ if __name__ == "__main__":
         )
     )
 
-    # 6. Hardcode a user query, get embedding, transform to 3D
-    user_query = "What is this AI Quiz and AI Polls about?"
-    query_embedding = vector_db._embedding_function.embed_query(user_query)
-
-    # Transform the single embedding into 3D via the same UMAP reducer
     query_embedding_3d = reducer.transform([query_embedding])
 
-    # 7. Add the user query as a separate trace (red marker)
     fig.add_trace(
         go.Scatter3d(
             x=[query_embedding_3d[0, 0]],
@@ -110,7 +87,6 @@ if __name__ == "__main__":
         )
     )
 
-    # 8. Final layout and show
     fig.update_layout(
         title="Text Embeddings Visualized in 3D Space (User Query in Red)",
         scene=dict(
@@ -123,3 +99,30 @@ if __name__ == "__main__":
     )
 
     fig.show()
+
+
+if __name__ == "__main__":
+    processor = DocumentProcessor()
+    pdf_path = Path("../../data/pdfs/cv.pdf")
+    documents = processor.load_pdf(pdf_path)
+    chunks = processor.split_documents(documents)
+
+    vector_store = VectorStore()
+    vector_db = vector_store.create_vector_db(
+        documents=chunks, collection_name="local-rag"
+    )
+
+    user_query = "What is this AI Quiz and AI Polls about?"
+    query_embedding = vector_db._embedding_function.embed_query(user_query)
+
+    embeddings_obj = vector_db._collection.get(include=["embeddings"])
+    chunk_embeddings = embeddings_obj["embeddings"]
+
+    texts = [chunk.page_content for chunk in chunks]
+
+    reducer = umap.UMAP(n_components=3)
+    chunk_embeddings_3d = reducer.fit_transform(chunk_embeddings)
+
+    wrapped_texts = ["<br>".join(textwrap.wrap(txt, width=80)) for txt in texts]
+
+    plot_embeddings(chunk_embeddings, texts, query_embedding, user_query)

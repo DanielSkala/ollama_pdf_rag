@@ -17,3 +17,5 @@ pytest==7.4.4
 pytest-cov==4.1.0
 coverage==7.4.0
 pydantic==2.10.4
+plotly==5.15.0
+umap-learn==0.5.7

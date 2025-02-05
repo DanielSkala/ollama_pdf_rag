@@ -1,21 +1,23 @@
 """Document processing functionality."""
+
 import logging
 from pathlib import Path
 from typing import List
+
 from langchain_community.document_loaders import UnstructuredPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 logger = logging.getLogger(__name__)
 
+
 class DocumentProcessor:
     """Handles PDF document loading and processing."""
-    
+
     def __init__(self, chunk_size: int = 200, chunk_overlap: int = 50):
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap
+            chunk_size=chunk_size, chunk_overlap=chunk_overlap
         )
 
     def load_pdf(self, file_path: Path) -> List:
@@ -27,7 +29,7 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"Error loading PDF: {e}")
             raise
-    
+
     def split_documents(self, documents: List) -> List:
         """Split documents into chunks."""
         try:
@@ -38,9 +40,9 @@ class DocumentProcessor:
             raise
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     processor = DocumentProcessor()
-    pdf_path = Path("../../data/pdfs/sample/scammer-agent.pdf")
+    pdf_path = Path("../../data/pdfs/cv.pdf")
     documents = processor.load_pdf(pdf_path)
     chunks = processor.split_documents(documents)
     print(f"Number of chunks: {len(chunks)}")
