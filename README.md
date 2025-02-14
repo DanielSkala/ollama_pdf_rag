@@ -85,6 +85,43 @@ Then open your browser to `http://localhost:8501`
 
 ---
 
+# 🐳 Running the Chatbot with Docker
+
+If you prefer **not** to install dependencies manually, you can run the chatbot inside a **Docker container**.
+
+### **1️⃣ Install Docker Desktop**
+1. **Download & Install Docker Desktop** from [here](https://www.docker.com/products/docker-desktop).
+2. **Create a free Docker account** (if you don’t have one).
+3. **Ensure Docker is running** before proceeding.
+
+### **2️⃣ Download the Pre-Built Docker Image**
+Instead of building the image yourself, you can **download it from Google Drive**:
+- [👉 Download Docker Image Here](TODO: INSERT GOOGLE DRIVE LINK)
+
+Once downloaded, **move it to a convenient location**.
+
+### **3️⃣ Load the Docker Image**
+Open a **terminal (PowerShell or Command Prompt)** and run:
+```bash
+docker load -i path/to/chatbot-demo.tar
+```
+
+### **4️⃣ Run the Chatbot**
+Run the following command to start the chatbot:
+```bash
+docker run -p 8501:8501 -e OLLAMA_HOST="http://host.docker.internal:11434" --add-host=host.docker.internal:host-gateway drockdocker/microstep-chatbot-docker-repo:latest
+```
+
+If Ollama is not running, start it by simply searching for Ollama and clicking on the app or running:
+```bash
+ollama serve
+```
+Then, visit http://localhost:8501 in your browser to start using the chatbot.
+In the Streamlit demo, toggle "Use sample PDF (CV.pdf)" to chat with the bot using a sample PDF.
+Keep in mind that the app needs to load the pdf file (5sec), chunk it, and generate embeddings for each chunk using your laptop's CPU. This process can take a minute or two, so please be patient.
+
+---
+
 ### Running separate modules
 
 Running separate modules is useful for debugging a specific part of the RAG pipeline. For example, the chunking strategy
@@ -97,3 +134,11 @@ Under `src/core/` you can find the following modules:
   3D space using UMAP
 - `llm.py`: Currently just instantiates ChatOllama and defines prompts
 - `rag.py`: Implements the RAG pipeline from user input to answer generation
+
+---
+
+# ❓ Troubleshooting
+If you face any issues:
+
+1. Ensure Docker Desktop is running before loading the image.
+2. Check Ollama status with `curl http://localhost:11434/api/tags`

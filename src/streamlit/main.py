@@ -280,7 +280,7 @@ def main() -> None:
 
     if use_sample:
         # Use the sample PDF
-        sample_path = "data/pdfs/cv.pdf"
+        sample_path = "data/pdfs/CV.pdf"
         if os.path.exists(sample_path):
             if st.session_state["vector_db"] is None:
                 with st.spinner("Processing sample PDF..."):
