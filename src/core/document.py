@@ -1,6 +1,8 @@
 import base64
 import logging
+import os
 import re
+import time
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Tuple
@@ -9,6 +11,7 @@ import fitz  # PyMuPDF
 import spacy
 from dotenv import dotenv_values
 from openai import OpenAI
+
 from src.core.models import Chunk, ChunkType
 
 logger = logging.getLogger(__name__)
@@ -20,86 +23,120 @@ OPENAI_API_KEY = ENV_VARS["OPENAI_API_KEY"]
 MODEL = "gpt-4o-mini"
 
 
-def get_page_for_offset(offset: int, page_starts: List[Tuple[int, int]]) -> int:
+class ImageTranscriber:
     """
-    Determines the page number for a given character offset based on the
-    list of (page_number, start_offset) pairs.
+    Transcribes images in a PDF document using the OpenAI API
     """
-    page_for_chunk = None
-    for page_num, start_offset in page_starts:
-        if offset >= start_offset:
-            page_for_chunk = page_num
-        else:
-            break
-    return page_for_chunk if page_for_chunk is not None else 0
 
+    def __init__(self, openai_api_key, model, cache_dir="image_transcriptions_cache"):
+        self.logger = logging.getLogger(__name__)
+        self.OPENAI_API_KEY = openai_api_key
+        self.MODEL = model
+        self.cache_dir = cache_dir
+        os.makedirs(self.cache_dir, exist_ok=True)
 
-def image_to_text(base64_image, ext: str) -> str:
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    def convert_images_in_page_to_text(self, document, page) -> str:
+        """
+        Processes the page by replacing qualifying images with their text transcriptions.
+        It first checks if a transcription is cached; if not, it calls the OpenAI API.
+        Returns the modified page.
+        """
+        self.logger.info(f"Replacing images by text. Page number: {page.number}")
+        image_info = page.get_image_info()
 
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": """Image is from the MicroStep-MIS documentation. The description
-                                should contain technical, meteorological or physics jargon. The image
-                                can be diagram, screenshot from the IMS system or a schematic.
-                                Describe what is on this image in 3-5 sentences.""",
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/{ext};base64,{base64_image}"},
-                    },
-                ],
-            }
-        ],
-    )
+        for im_index, image in enumerate(page.get_images()):
+            if self._is_image_size_sufficient(image_info[im_index]):
+                xref = image[0]  # XREF of the image is an integer.
+                base_image = document.extract_image(xref)
+                image_bytes = base_image["image"]
+                image_ext = base_image["ext"].lower()
 
-    return response.choices[0].message.content
+                if image_ext in ("jpg", "jpeg", "png"):
+                    base64_image = base64.b64encode(image_bytes).decode("utf-8")
+                    cache_file = os.path.join(self.cache_dir, f"{xref}.{image_ext}.txt")
 
+                    if os.path.exists(cache_file):
+                        with open(cache_file, "r", encoding="utf-8") as f:
+                            self.logger.info(
+                                f"Using cached transcription for image {xref}"
+                            )
+                            image_text = f.read().strip()
+                    else:
+                        self.logger.info(
+                            f"Using OpenAI API for transcription of image {xref}"
+                        )
+                        image_text = self._image_to_text(base64_image, image_ext)
+                        with open(cache_file, "w", encoding="utf-8") as f:
+                            f.write(image_text)
 
-def is_image_size_sufficient(image_info) -> bool:
-    # set min image borders (size)
-    min_image_size = 1000
-    min_image_width = 50
-    min_image_height = 50
-    # get image dimensions
-    im_s = image_info["size"]
-    im_w = image_info["width"]
-    im_h = image_info["height"]
-    return (
-        im_s >= min_image_size and im_w >= min_image_width and im_h >= min_image_height
-    )
+                    # Insert the transcribed text in place of the image.
+                    bbox = page.get_image_rects(xref)[0]
+                    page.insert_text(bbox[0:2], image_text, fontsize=1, color=(1, 0, 0))
 
+        return page
 
-def convert_images_in_page_to_text(document, page) -> str:
-    """
-    Returns page where images (fulfilling conditions) are replaced by text
-    """
-    logger.info(f"Replacing images by text. Page number: {page.number}")
+    def _image_to_text(self, base64_image, ext: str) -> str:
+        client = OpenAI(api_key=self.OPENAI_API_KEY)
+        max_retries = 10
+        delay = 1  # initial delay in seconds
 
-    # get image info
-    image_info = page.get_image_info()
-    # go througt all images from page
-    for im_index, image in enumerate(page.get_images()):
-        if is_image_size_sufficient(image_info[im_index]):
-            xref = image[0]  # get the XREF of the image
-            base_image = document.extract_image(xref)
-            image_bytes = base_image["image"]  # extract the image bytes
-            image_ext = base_image["ext"]  # get the image extension
-            if image_ext in ("jpg", "jpeg", "png"):
-                image_bytes = base64.b64encode(image_bytes).decode("utf-8")
-                image_text = image_to_text(image_bytes, image_ext)
-                bbox = page.get_image_rects(xref)[0]  # Get the image bounding box
-                # Insert replacement text at the image position
-                page.insert_text(
-                    bbox[0:2], image_text, fontsize=1, color=(1, 0, 0)
-                )  # Red text
-    return page
+        image_prompt = (
+            "You will be given an image from the MicroStep-MIS documentation. "
+            "This image will likely be a screenshot, diagram, or a schema. "
+            "Your task is to describe what is on this image in 2-3 brief sentences. "
+            "If the image appears to be a logo/icon, or something generic, simply say that the image "
+            "is a logo of MicroStep-MIS. Output the text description in this format: \n\n"
+            "[image]: <insert your description here>\n\n"
+            "Example: \n\n"
+            "[image]: Schema depicting an airport runway equipped with various meteorological and "
+            "environmental sensors..."
+        )
+
+        for attempt in range(max_retries):
+            try:
+                response = client.chat.completions.create(
+                    model=self.MODEL,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": image_prompt,
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/{ext};base64,{base64_image}"
+                                    },
+                                },
+                            ],
+                        }
+                    ],
+                )
+                return response.choices[0].message.content
+
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise e  # re-raise the exception if out of retries
+                time.sleep(delay)
+                delay *= 2  # exponential backoff
+
+    def _is_image_size_sufficient(self, image_info) -> bool:
+        # Set minimum image parameters.
+        min_image_size = 1000
+        min_image_width = 50
+        min_image_height = 50
+
+        im_s = image_info["size"]
+        im_w = image_info["width"]
+        im_h = image_info["height"]
+
+        return (
+            im_s >= min_image_size
+            and im_w >= min_image_width
+            and im_h >= min_image_height
+        )
 
 
 class PDFLoader:
@@ -108,9 +145,10 @@ class PDFLoader:
     with a list of (page_number, start_offset) pairs.
     """
 
-    def load(
-        self, file_path: Path, conv_imgs_to_text=True
-    ) -> Tuple[str, List[Tuple[int, int]]]:
+    def __init__(self, image_transcriber: ImageTranscriber = None):
+        self.image_transcriber = image_transcriber
+
+    def load(self, file_path: Path) -> Tuple[str, List[Tuple[int, int]]]:
         try:
             logger.info(f"Loading PDF from {file_path}")
             doc = fitz.open(str(file_path))
@@ -119,15 +157,12 @@ class PDFLoader:
             current_offset = 0
 
             for page in doc:
-                if conv_imgs_to_text:
-                    page = convert_images_in_page_to_text(doc, page)
+                if self.image_transcriber:
+                    page = self.image_transcriber.convert_images_in_page_to_text(
+                        doc, page
+                    )
 
-                # sorted (sorted by y0 coordinate of each text block)
-                text = page.get_text("blocks")
-                tmp_list = sorted(text, key=lambda x: x[1])
-                # tmp_list[i][4] is text part for ordered text blocks
-                text = " ".join([tmp_list[i][4] for i in range(len(tmp_list))])
-
+                text = page.get_text()
                 page_starts.append((page.number, current_offset))
                 full_text += text
                 current_offset += len(text)
@@ -152,10 +187,24 @@ class ChunkingStrategy(ABC):
     ) -> List[Chunk]:
         pass
 
+    @staticmethod
+    def _get_page_for_offset(offset: int, page_starts: List[Tuple[int, int]]) -> int:
+        """
+        Determines the page number for a given character offset based on the
+        list of (page_number, start_offset) pairs.
+        """
+        page_for_chunk = None
+        for page_num, start_offset in page_starts:
+            if offset >= start_offset:
+                page_for_chunk = page_num
+            else:
+                break
+        return page_for_chunk if page_for_chunk is not None else 0
+
 
 class ConstantLengthChunkStrategy(ChunkingStrategy):
     """
-    Splits text into fixed-size chunks with optional overlap.
+    Dummy strategy that splits text into fixed-size chunks with optional overlap.
     """
 
     def __init__(self, chunk_size: int = 200, chunk_overlap: int = 50):
@@ -172,7 +221,7 @@ class ConstantLengthChunkStrategy(ChunkingStrategy):
         while start < len(document_text):
             end = start + self.chunk_size
             text_chunk = document_text[start:end].strip()
-            pdf_page = get_page_for_offset(start, page_starts)
+            pdf_page = self._get_page_for_offset(start, page_starts)
             chunk = Chunk(
                 id=f"{pdf_name}-{chunk_index}",
                 pdf_name=pdf_name,
@@ -186,48 +235,6 @@ class ConstantLengthChunkStrategy(ChunkingStrategy):
             chunk_index += 1
             # Advance the start pointer to create overlapping chunks.
             start += self.chunk_size - self.chunk_overlap
-
-        return chunks
-
-
-class ParagraphChunkStrategy(ChunkingStrategy):
-    """
-    Splits text by paragraphs.
-    Assumes paragraphs are separated by one or more blank lines.
-    """
-
-    def __init__(self, delimiter: str = "\n\n"):
-        self.delimiter = delimiter
-
-    def chunk_document(
-        self, document_text: str, pdf_name: str, page_starts: List[Tuple[int, int]]
-    ) -> List[Chunk]:
-        raw_paragraphs = document_text.split(self.delimiter)
-        chunks = []
-        current_offset = 0
-        chunk_index = 1
-
-        for para in raw_paragraphs:
-            para = para.strip()
-            if not para:
-                continue
-            # Find the offset of this paragraph starting from the current_offset.
-            offset = document_text.find(para, current_offset)
-            if offset == -1:
-                offset = current_offset
-            current_offset = offset + len(para)
-            pdf_page = get_page_for_offset(offset, page_starts)
-            chunk = Chunk(
-                id=f"{pdf_name}-{chunk_index}",
-                pdf_name=pdf_name,
-                pdf_page=pdf_page,
-                section_name=None,
-                subsection_name=None,
-                chunk_type=ChunkType.TEXT,
-                text=para,
-            )
-            chunks.append(chunk)
-            chunk_index += 1
 
         return chunks
 
@@ -343,7 +350,7 @@ class AdvancedParagraphChunkStrategy(ChunkingStrategy):
         if not chunk_text:
             return None
 
-        pdf_page = get_page_for_offset(start_index, page_starts)
+        pdf_page = self._get_page_for_offset(start_index, page_starts)
         return Chunk(
             id=f"{pdf_name}-{chunk_index}",
             pdf_name=pdf_name,
@@ -354,30 +361,6 @@ class AdvancedParagraphChunkStrategy(ChunkingStrategy):
             text=self._remove_footer(chunk_text),
             keywords=self._extract_content_words(chunk_text),
         )
-
-
-class LayoutPDFReaderChunkingStrategy(ChunkingStrategy):
-    """
-    Future implementation using intelligent layout-aware chunking.
-    """
-
-    def chunk_document(
-        self, document_text: str, pdf_name: str, page_starts: List[Tuple[int, int]]
-    ) -> List[Chunk]:
-        # Implementation can be added later.
-        pass
-
-
-class CLAREDIChunkingStrategy(ChunkingStrategy):
-    """
-    Future implementation for Context Length Aware Ranked Elided Document Injection.
-    """
-
-    def chunk_document(
-        self, document_text: str, pdf_name: str, page_starts: List[Tuple[int, int]]
-    ) -> List[Chunk]:
-        # Implementation can be added later.
-        pass
 
 
 class DocumentProcessor:
@@ -404,38 +387,14 @@ class DocumentProcessor:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    pdf_loader = PDFLoader()
+    image_transcriber = ImageTranscriber(openai_api_key=OPENAI_API_KEY, model=MODEL)
+
+    # Automatically transcribe images when the PDFLoader gets the image_transcriber
+    # If it is set to None, images will NOT be transcribed
+    pdf_loader = PDFLoader(image_transcriber=image_transcriber)
 
     pdf_path = Path("../../data/pdfs/microstepexample.pdf")
 
-    """
-    # Example 1: Using the constant length chunk strategy
-    constant_chunk_strategy = ConstantLengthChunkStrategy(
-        chunk_size=300, chunk_overlap=50
-    )
-    processor_constant = DocumentProcessor(
-        loader=pdf_loader, chunk_strategy=constant_chunk_strategy
-    )
-
-    constant_chunks = processor_constant.process_pdf(pdf_path)
-    print(f"Number of chunks (constant strategy): {len(constant_chunks)}")
-    for i, chunk in enumerate(constant_chunks):
-        print(f"--- Chunk {i+1} ---")
-        print(chunk)
-        print("\n")
-
-    # Example 2: Using the paragraph-based chunk strategy
-    paragraph_chunk_strategy = ParagraphChunkStrategy(delimiter="\n\n")
-    processor_paragraph = DocumentProcessor(loader=pdf_loader, chunk_strategy=paragraph_chunk_strategy)
-
-    paragraph_chunks = processor_paragraph.process_pdf(pdf_path)
-    print(f"Number of chunks (paragraph strategy): {len(paragraph_chunks)}")
-    for i, chunk in enumerate(paragraph_chunks):
-        print(f"--- Chunk {i+1} ---")
-        print(chunk)
-        print("\n")
-
-    """
     # Example 3: Use the advanced paragraph chunk strategy
     # Option A: chunk_i = (sub)section_i as extracted from the table of contents
 

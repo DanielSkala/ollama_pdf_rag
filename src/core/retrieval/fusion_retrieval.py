@@ -8,7 +8,7 @@ from typing import Dict, List
 
 from base import RetrievalStrategy, ScoredChunk
 from embedding_strategy import EmbeddingsRetrievalStrategy
-from keyphrases_strategy import KeyphraseRetrievalStrategy, extract_content_words
+from keyphrases_strategy import KeyphraseRetrievalStrategy
 from vector_store import VectorStore
 
 from src.core.document import (
