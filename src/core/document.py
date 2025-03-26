@@ -1,3 +1,4 @@
+import base64
 import logging
 import re
 from abc import ABC, abstractmethod
@@ -6,12 +7,17 @@ from typing import List, Tuple
 
 import fitz  # PyMuPDF
 import spacy
-
+from dotenv import dotenv_values
+from openai import OpenAI
 from src.core.models import Chunk, ChunkType
 
 logger = logging.getLogger(__name__)
 
 nlp = spacy.load("en_core_web_sm")
+
+ENV_VARS = dotenv_values("../../.env.local")
+OPENAI_API_KEY = ENV_VARS["OPENAI_API_KEY"]
+MODEL = "gpt-4o-mini"
 
 
 def get_page_for_offset(offset: int, page_starts: List[Tuple[int, int]]) -> int:
@@ -28,13 +34,83 @@ def get_page_for_offset(offset: int, page_starts: List[Tuple[int, int]]) -> int:
     return page_for_chunk if page_for_chunk is not None else 0
 
 
+def image_to_text(base64_image, ext: str) -> str:
+    client = OpenAI(api_key=OPENAI_API_KEY)
+
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": """Image is from the MicroStep-MIS documentation. The description
+                                should contain technical, meteorological or physics jargon. The image
+                                can be diagram, screenshot from the IMS system or a schematic.
+                                Describe what is on this image in 3-5 sentences.""",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/{ext};base64,{base64_image}"},
+                    },
+                ],
+            }
+        ],
+    )
+
+    return response.choices[0].message.content
+
+
+def is_image_size_sufficient(image_info) -> bool:
+    # set min image borders (size)
+    min_image_size = 1000
+    min_image_width = 50
+    min_image_height = 50
+    # get image dimensions
+    im_s = image_info["size"]
+    im_w = image_info["width"]
+    im_h = image_info["height"]
+    return (
+        im_s >= min_image_size and im_w >= min_image_width and im_h >= min_image_height
+    )
+
+
+def convert_images_in_page_to_text(document, page) -> str:
+    """
+    Returns page where images (fulfilling conditions) are replaced by text
+    """
+    logger.info(f"Replacing images by text. Page number: {page.number}")
+
+    # get image info
+    image_info = page.get_image_info()
+    # go througt all images from page
+    for im_index, image in enumerate(page.get_images()):
+        if is_image_size_sufficient(image_info[im_index]):
+            xref = image[0]  # get the XREF of the image
+            base_image = document.extract_image(xref)
+            image_bytes = base_image["image"]  # extract the image bytes
+            image_ext = base_image["ext"]  # get the image extension
+            if image_ext in ("jpg", "jpeg", "png"):
+                image_bytes = base64.b64encode(image_bytes).decode("utf-8")
+                image_text = image_to_text(image_bytes, image_ext)
+                bbox = page.get_image_rects(xref)[0]  # Get the image bounding box
+                # Insert replacement text at the image position
+                page.insert_text(
+                    bbox[0:2], image_text, fontsize=1, color=(1, 0, 0)
+                )  # Red text
+    return page
+
+
 class PDFLoader:
     """
     Loads PDF documents using PyMuPDF (fitz) and returns the full text along
     with a list of (page_number, start_offset) pairs.
     """
 
-    def load(self, file_path: Path) -> Tuple[str, List[Tuple[int, int]]]:
+    def load(
+        self, file_path: Path, conv_imgs_to_text=True
+    ) -> Tuple[str, List[Tuple[int, int]]]:
         try:
             logger.info(f"Loading PDF from {file_path}")
             doc = fitz.open(str(file_path))
@@ -43,7 +119,15 @@ class PDFLoader:
             current_offset = 0
 
             for page in doc:
-                text = page.get_text()
+                if conv_imgs_to_text:
+                    page = convert_images_in_page_to_text(doc, page)
+
+                # sorted (sorted by y0 coordinate of each text block)
+                text = page.get_text("blocks")
+                tmp_list = sorted(text, key=lambda x: x[1])
+                # tmp_list[i][4] is text part for ordered text blocks
+                text = " ".join([tmp_list[i][4] for i in range(len(tmp_list))])
+
                 page_starts.append((page.number, current_offset))
                 full_text += text
                 current_offset += len(text)
