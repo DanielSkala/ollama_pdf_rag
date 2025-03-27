@@ -23,12 +23,9 @@ class Chunk(BaseModel):
 
     def __repr__(self) -> str:
         return (
-            f"CHUNK {self.id}:\n"
-            f"Document={self.pdf_name!r},\n"
+            f"CHUNK ID '{self.id}':\n"
             f"Page={self.pdf_page},\n"
             f"Section={self.section_name!r},\n"
-            f"Subsection={self.subsection_name!r},\n"
-            f"Type={self.chunk_type},\n"
             f"Text={self.text!r}\n"
         )
 

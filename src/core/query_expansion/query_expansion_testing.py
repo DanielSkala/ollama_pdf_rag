@@ -1,11 +1,19 @@
-from llm import LLMManager
-from query_expansion.compression_upscaling import CompressionUpscalingStrategy
-from query_expansion.expansion_module import QueryExpansionModule
-from query_expansion.paraphrase import ParaphraseStrategy
+from dotenv import dotenv_values
+
+from src.core.llm import LLMManager
+from src.core.query_expansion.compression_upscaling import CompressionUpscalingStrategy
+from src.core.query_expansion.expansion_module import QueryExpansionModule
+from src.core.query_expansion.paraphrase import ParaphraseStrategy
+
+ENV_VARS = dotenv_values("../../.env.local")
+OPENAI_API_KEY = ENV_VARS["OPENAI_API_KEY"]
+MODEL = "gpt-4o-mini"
 
 
-def main():
-    llm_manager = LLMManager(model_name="llama3.2")
+if __name__ == "__main__":
+    llm_manager = LLMManager(
+        model_name=MODEL, provider="openai", openai_api_key=OPENAI_API_KEY
+    )
 
     # 1. Create a compression_upscaling strategy instance
     compression_strategy = CompressionUpscalingStrategy(
@@ -35,7 +43,3 @@ def main():
     print("\nParaphrased Queries:")
     for paraphrase in paraphrased_queries:
         print(paraphrase)
-
-
-if __name__ == "__main__":
-    main()

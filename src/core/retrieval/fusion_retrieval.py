@@ -6,16 +6,15 @@ from itertools import chain
 from pathlib import Path
 from typing import Dict, List
 
-from base import RetrievalStrategy, ScoredChunk
-from embedding_strategy import EmbeddingsRetrievalStrategy
-from keyphrases_strategy import KeyphraseRetrievalStrategy
-from vector_store import VectorStore
-
 from src.core.document import (
     AdvancedParagraphChunkStrategy,
     DocumentProcessor,
     PDFLoader,
 )
+from src.core.retrieval.base import RetrievalStrategy, ScoredChunk
+from src.core.retrieval.embedding_strategy import EmbeddingsRetrievalStrategy
+from src.core.retrieval.keyphrases_strategy import KeyphraseRetrievalStrategy
+from src.core.retrieval.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -92,15 +91,15 @@ class FusionRetrieval:
         }
         kp_raw = {cid: data["kp"] for cid, data in groups.items()}
 
-        print(f"Emb Raw: {emb_raw}")
-        print(f"KP Raw: {kp_raw}\n")
+        logger.info(f"Emb Raw: {emb_raw}")
+        logger.info(f"KP Raw: {kp_raw}")
 
         # 3. Normalize scores.
         norm_emb = self._normalize_scores(emb_raw, lower_is_better=True)
         norm_kp = self._normalize_scores(kp_raw, lower_is_better=False)
 
-        print(f"Norm Emb: {norm_emb}")
-        print(f"Norm KP: {norm_kp}\n")
+        logger.info(f"Norm Emb: {norm_emb}")
+        logger.info(f"Norm KP: {norm_kp}")
 
         # 4. Fuse scores.
         fused_results = []
@@ -117,7 +116,7 @@ class FusionRetrieval:
                 )
             )
 
-        print(f"Fused Results: {fused_results}")
+        logger.info(f"Fused Results: {fused_results}")
 
         return fused_results
 
@@ -170,7 +169,7 @@ class FusionRetrieval:
 
 if __name__ == "__main__":
     start = time.time()
-    pdf_path = Path("../../../data/pdfs/microstepexample.pdf")
+    pdf_path = Path("../../data/pdfs/microstepexample.pdf")
     pdf_loader = PDFLoader()
     advanced_paragraph_chunk_strategy = AdvancedParagraphChunkStrategy()
     processor_paragraph = DocumentProcessor(

@@ -29,7 +29,6 @@ class ImageTranscriber:
     """
 
     def __init__(self, openai_api_key, model, cache_dir="image_transcriptions_cache"):
-        self.logger = logging.getLogger(__name__)
         self.OPENAI_API_KEY = openai_api_key
         self.MODEL = model
         self.cache_dir = cache_dir
@@ -41,11 +40,11 @@ class ImageTranscriber:
         It first checks if a transcription is cached; if not, it calls the OpenAI API.
         Returns the modified page.
         """
-        self.logger.info(f"Replacing images by text. Page number: {page.number}")
+        logger.info(f"Replacing images by text. Page number: {page.number}")
         image_info = page.get_image_info()
 
         for im_index, image in enumerate(page.get_images()):
-            if self._is_image_size_sufficient(image_info[im_index]):
+            if self._is_image_valid(image_info[im_index]):
                 xref = image[0]  # XREF of the image is an integer.
                 base_image = document.extract_image(xref)
                 image_bytes = base_image["image"]
@@ -57,12 +56,10 @@ class ImageTranscriber:
 
                     if os.path.exists(cache_file):
                         with open(cache_file, "r", encoding="utf-8") as f:
-                            self.logger.info(
-                                f"Using cached transcription for image {xref}"
-                            )
+                            logger.info(f"Using cached transcription for image {xref}")
                             image_text = f.read().strip()
                     else:
-                        self.logger.info(
+                        logger.info(
                             f"Using OpenAI API for transcription of image {xref}"
                         )
                         image_text = self._image_to_text(base64_image, image_ext)
@@ -122,11 +119,19 @@ class ImageTranscriber:
                 time.sleep(delay)
                 delay *= 2  # exponential backoff
 
-    def _is_image_size_sufficient(self, image_info) -> bool:
-        # Set minimum image parameters.
+    def _is_image_valid(self, image_info) -> bool:
+        """
+        Image is valid if it is large enough (to omit small icons) and if it is outside of header.
+
+        Example or logo in header:
+        'bbox': (74.3499984741211, 38.6999626159668, 241.5, 65.14996337890625)
+        """
+
         min_image_size = 1000
         min_image_width = 50
         min_image_height = 50
+        header_y_coordinate = 70  # y-coordinate of the header
+        bbox = image_info["bbox"]
 
         im_s = image_info["size"]
         im_w = image_info["width"]
@@ -136,6 +141,7 @@ class ImageTranscriber:
             im_s >= min_image_size
             and im_w >= min_image_width
             and im_h >= min_image_height
+            and bbox[3] > header_y_coordinate
         )
 
 
@@ -199,7 +205,7 @@ class ChunkingStrategy(ABC):
                 page_for_chunk = page_num
             else:
                 break
-        return page_for_chunk if page_for_chunk is not None else 0
+        return page_for_chunk + 1 if page_for_chunk is not None else 0
 
 
 class ConstantLengthChunkStrategy(ChunkingStrategy):
