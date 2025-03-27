@@ -29,3 +29,8 @@ data/vectors/
 .coverage
 htmlcov/
 coverage.xml
+/.env.local
+/src/core/retrieval/db/
+/.env.local
+/src/core/retrieval/db/
+/src/core/transcriptions/

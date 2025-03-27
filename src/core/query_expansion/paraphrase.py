@@ -1,7 +1,7 @@
 import re
 from typing import List
 
-from .base import QueryExpansionStrategy
+from base import QueryExpansionStrategy
 
 
 class ParaphraseStrategy(QueryExpansionStrategy):
@@ -23,7 +23,7 @@ class ParaphraseStrategy(QueryExpansionStrategy):
         return responses[: self.num_paraphrases]
 
     def expand_query(self, query: str) -> List[str]:
-        system_message = (
+        system_prompt = (
             "You are a helpful assistant specialized in MicroStep-MIS documentation. "
             "MicroStep-MIS develops and manufactures customized monitoring and information systems for environmental monitoring, "
             "including aviation, road weather, and marine systems. Please provide {self.num_paraphrases} distinct paraphrases of the user's query. "
@@ -37,12 +37,13 @@ class ParaphraseStrategy(QueryExpansionStrategy):
             "Now, please generate the paraphrases for the given user query."
         )
 
-        human_message = (
+        user_prompt = (
             f'User query: "{query}"\n'
             "Now, please generate paraphrases of the above query in the specified format:\n"
         )
 
-        messages = [("system", system_message), ("human", human_message)]
-        ai_msg = self.llm_manager.llm.invoke(messages)
-
-        return self.postprocess_response(ai_msg.content)
+        response = self.llm_manager.generate_response(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        )
+        return self.postprocess_response(response)

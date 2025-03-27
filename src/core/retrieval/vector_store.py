@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 class VectorStore:
-    """Manages vector database operations using the updated ChromaDB configuration."""
+    """Manages vector database operations using ChromaDB."""
 
     def __init__(
         self, collection_name: str = "local-rag", persist_directory: str = "db/"
@@ -24,11 +24,17 @@ class VectorStore:
             )
         )
         try:
+            # Try to create a new collection
             self.collection = self.client.create_collection(name=self.collection_name)
             logger.info(f"Created new collection '{self.collection_name}'")
         except UniqueConstraintError:
+            # If it already exists, get the existing one
             self.collection = self.client.get_collection(name=self.collection_name)
             logger.info(f"Using existing collection '{self.collection_name}'")
+
+    def collection_exists(self) -> bool:
+        collections = self.client.list_collections()
+        return self.collection_name in collections
 
     def create_vector_db(
         self,

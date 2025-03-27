@@ -1,6 +1,6 @@
 from typing import List
 
-from base import RetrievalStrategy, ScoredChunk
+from .base import RetrievalStrategy, ScoredChunk
 
 
 class EmbeddingsRetrievalStrategy(RetrievalStrategy):

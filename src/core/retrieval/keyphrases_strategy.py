@@ -2,7 +2,8 @@ from collections import Counter
 from typing import List
 
 import spacy
-from base import RetrievalStrategy, ScoredChunk
+
+from .base import RetrievalStrategy, ScoredChunk
 
 # TODO: duplicate in document.py!
 nlp = spacy.load("en_core_web_sm")
