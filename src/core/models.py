@@ -32,6 +32,32 @@ class Chunk(BaseModel):
     def __str__(self) -> str:
         return self.__repr__()
 
+    def to_dict(self):
+        """Return a dictionary of only serializable fields."""
+        return {
+            "id": self.id,
+            "pdf_name": self.pdf_name,
+            "pdf_page": self.pdf_page,
+            "section_name": self.section_name,
+            "subsection_name": self.subsection_name,
+            "chunk_type": self.chunk_type,
+            "text": self.text,
+            "keywords": self.keywords,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Chunk":
+        return cls(
+            id=d.get("id"),
+            pdf_name=d.get("pdf_name"),
+            pdf_page=d.get("pdf_page"),
+            section_name=d.get("section_name"),
+            subsection_name=d.get("subsection_name"),
+            chunk_type=ChunkType(d.get("chunk_type")),
+            text=d.get("text"),
+            keywords=d.get("keywords"),
+        )
+
 
 if __name__ == "__main__":
     chunk = Chunk(

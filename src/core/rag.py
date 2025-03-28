@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 from pathlib import Path
@@ -12,6 +13,8 @@ from src.core.document import (
     PDFLoader,
 )
 from src.core.llm import LLMManager
+from src.core.models import Chunk
+from src.core.prompts import get_system_prompt, get_user_prompt
 from src.core.query_expansion.compression_upscaling import CompressionUpscalingStrategy
 from src.core.query_expansion.expansion_module import QueryExpansionModule
 from src.core.retrieval.embedding_strategy import EmbeddingsRetrievalStrategy
@@ -58,24 +61,32 @@ class RAG:
         self.llm_manager = llm_manager
         self.query_expansion_module = query_expansion_module
         self.pdf_loader = pdf_loader if pdf_loader is not None else PDFLoader()
-        self.chunk_strategy = chunk_strategy
+        self.chunk_strategy = (
+            chunk_strategy
+            if chunk_strategy is not None
+            else AdvancedParagraphChunkStrategy()
+        )
         self.processor = DocumentProcessor(
             loader=self.pdf_loader, chunk_strategy=self.chunk_strategy
         )
         self.chunks: List[Any] = []
         self.vector_store = VectorStore(collection_name=vector_collection_name)
-        self.fusion_config = fusion_retrieval_config
+        self.fusion_config = (
+            fusion_retrieval_config if fusion_retrieval_config is not None else {}
+        )
         self.fusion_retriever = None
-        self._initialize_system()
 
     def _initialize_system(self):
-        """Processes the document, creates chunks, initializes vector store and the fusion retriever."""
+        """
+        Processes the document, creates chunks, and builds the vector store and fusion retriever.
+        This is used when the vector DB does not yet exist or no chunk metadata is available.
+        """
         start_time = time.time()
-        logger.info("Starting document processing...")
+        logger.info("Processing PDF into chunks...")
         self.chunks = self.processor.process_pdf(self.pdf_path)
         logger.info(f"Document processed into {len(self.chunks)} chunks.")
 
-        # Build vector store using the chunks' text, metadata, and ids
+        # Build vector store using the chunks' text, metadata, and ids.
         documents = [chunk.text for chunk in self.chunks]
         metadatas = [
             {
@@ -86,6 +97,7 @@ class RAG:
                     "section_name": chunk.section_name,
                     "subsection_name": chunk.subsection_name,
                     "chunk_type": chunk.chunk_type,
+                    "chunk_data": json.dumps(chunk.to_dict()),
                 }.items()
                 if v is not None
             }
@@ -97,19 +109,75 @@ class RAG:
         )
         logger.info("Vector store created successfully.")
 
-        # Initialize fusion retriever with both embedding and keyphrase strategies
+        # Build the fusion retriever using both the embedding and keyphrase strategies.
         embedding_strategy = EmbeddingsRetrievalStrategy(self.vector_store)
         keyphrase_strategy = KeyphraseRetrievalStrategy(self.chunks)
-
         self.fusion_retriever = FusionRetrieval(
             strategies=[embedding_strategy, keyphrase_strategy],
             alpha=self.fusion_config.get("alpha", 0.5),
             max_cosine_distance=self.fusion_config.get("max_cosine_distance", 1.6),
             combined_threshold=self.fusion_config.get("combined_threshold", 0.4),
         )
-
         end_time = time.time()
         logger.info(f"RAG system initialized in {end_time - start_time:.2f} seconds.")
+
+    def _load_chunks_from_db(self) -> List[Any]:
+        """
+        Loads serialized chunk data from the vector store's metadata and rehydrates chunk objects.
+        """
+        logger.info("Loading chunks from existing vector DB metadata...")
+        result = self.vector_store.collection.get()
+        metadatas = result.get("metadatas", [])
+        documents = result.get("documents", [])
+        ids = result.get("ids", [])
+        loaded_chunks = []
+        for i, md in enumerate(metadatas):
+            if "chunk_data" in md:
+                try:
+                    chunk_dict = json.loads(md["chunk_data"])
+                    # Ensure text and id are consistent
+                    chunk_dict.setdefault("text", documents[i])
+                    chunk_dict.setdefault("id", ids[i])
+                    chunk = Chunk.from_dict(chunk_dict)
+                    loaded_chunks.append(chunk)
+                except Exception as e:
+                    logger.error(f"Error loading chunk {i}: {e}")
+            else:
+                logger.warning(f"No chunk_data found in metadata for document {i}")
+        logger.info(f"Loaded {len(loaded_chunks)} chunks from DB.")
+        return loaded_chunks
+
+    def initialize_vector_store(self):
+        """
+        Initializes the vector store. If the collection already exists, loads the chunks from
+        the DB metadata; otherwise, processes the PDF and creates the vector DB.
+        Finally, builds the fusion retriever.
+        """
+        if self.vector_store.collection_exists():
+            logger.info("Vector store already exists. Loading chunks from DB metadata.")
+            self.chunks = self._load_chunks_from_db()
+            if not self.chunks:
+                logger.warning("No chunk data loaded from DB. Reprocessing PDF.")
+                self._initialize_system()
+            else:
+                # Build fusion retriever based on loaded chunks.
+                embedding_strategy = EmbeddingsRetrievalStrategy(self.vector_store)
+                keyphrase_strategy = KeyphraseRetrievalStrategy(self.chunks)
+                self.fusion_retriever = FusionRetrieval(
+                    strategies=[embedding_strategy, keyphrase_strategy],
+                    alpha=self.fusion_config.get("alpha", 0.5),
+                    max_cosine_distance=self.fusion_config.get(
+                        "max_cosine_distance", 1.6
+                    ),
+                    combined_threshold=self.fusion_config.get(
+                        "combined_threshold", 0.4
+                    ),
+                )
+        else:
+            logger.info(
+                "Vector store does not exist. Processing PDF and creating vector DB."
+            )
+            self._initialize_system()
 
     def _retrieve(self, query: str, top_k: int = 7) -> List[Any]:
         """
@@ -124,19 +192,13 @@ class RAG:
         """
         logger.info("Expanding query...")
         expanded_query = self.query_expansion_module.expand_query(query)
-
         logger.info(f"Expanded query: {expanded_query}")
         logger.info("Performing retrieval...")
         results = self.fusion_retriever.retrieve(expanded_query, top_k)
-
         logger.info(f"Retrieved {len(results)} chunks.")
         return results
 
-    def generate_answer(
-        self,
-        query: str,
-        top_k: int = 7,
-    ) -> str:
+    def generate_answer(self, query: str, top_k: int = 7) -> str:
         """
         Generates an answer by retrieving relevant chunks and calling the LLM.
 
@@ -153,10 +215,10 @@ class RAG:
         for res in results:
             chunk = self._get_chunk_by_id(res.chunk_id)
             if chunk:
-                retrieved_texts += chunk.__str__() + "\n"
+                retrieved_texts += str(chunk) + "\n"
 
-        system_prompt = "You are a helpful assistant specialized in MicroStep-MIS documentation. Your task is to provide accurate and relevant information based on the user's query and the provided context. The context is a number of chunks that have sections, page numbers, and actual text from the documentation. Based on these chunks, answer the user question as accurately as possible and ALWAYS end your answer by pointing the user to a specific section and pdf page number to read more!"
-        final_user_prompt = f"User Query: {query}\n\nRelevant Information (chunks):\n\n{retrieved_texts}User Query: {query}\n\nAnd now provide an answer and also point the user to a specific section and page number to read more about the topic."
+        system_prompt = get_system_prompt()
+        final_user_prompt = get_user_prompt(query, retrieved_texts)
 
         print(final_user_prompt)
 
@@ -184,7 +246,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     # Setup configuration and credentials
-    MODEL = "gpt-4o"  # Or "llama3.2" if using Ollama
+    MODEL = "gpt-4o-mini"  # Or "llama3.2" if using Ollama
 
     # Initialize the image transcriber (used by the PDFLoader)
     image_transcriber = ImageTranscriber(openai_api_key=OPENAI_API_KEY, model=MODEL)
@@ -220,10 +282,14 @@ if __name__ == "__main__":
         vector_collection_name="local-rag",
     )
 
+    rag_system.initialize_vector_store()
+
     # Process a user query
     user_query = "What is the frequency of data updates, and how often does the Cloud Base Display refresh the information from the ceilometer?"
+    # user_query = "Where is Mona Lisa?"
+
     answer = rag_system.generate_answer(query=user_query)
     print("Generated Answer:\n", answer)
 
-    # Clean up resources
-    rag_system.cleanup()
+    # To persist the vector store for future runs, do NOT call cleanup.
+    # rag_system.cleanup()

@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 from collections import defaultdict
@@ -11,6 +12,7 @@ from src.core.document import (
     DocumentProcessor,
     PDFLoader,
 )
+from src.core.models import Chunk
 from src.core.retrieval.base import RetrievalStrategy, ScoredChunk
 from src.core.retrieval.embedding_strategy import EmbeddingsRetrievalStrategy
 from src.core.retrieval.keyphrases_strategy import KeyphraseRetrievalStrategy
@@ -131,6 +133,9 @@ class FusionRetrieval:
         """
         scores = list(raw_scores.values())
         min_val, max_val = min(scores), max(scores)
+        if min_val is None or max_val is None:
+            raise ValueError("Scores cannot be None.")
+
         if max_val == min_val:
             return {cid: 1.0 for cid in raw_scores}
 
@@ -167,41 +172,177 @@ class FusionRetrieval:
         return filtered
 
 
-if __name__ == "__main__":
-    start = time.time()
-    pdf_path = Path("../../data/pdfs/microstepexample.pdf")
-    pdf_loader = PDFLoader()
-    advanced_paragraph_chunk_strategy = AdvancedParagraphChunkStrategy()
-    processor_paragraph = DocumentProcessor(
-        loader=pdf_loader, chunk_strategy=advanced_paragraph_chunk_strategy
-    )
-    chunks = processor_paragraph.process_pdf(pdf_path)
+# if __name__ == "__main__":
+#     start = time.time()
+#     pdf_path = Path("../../data/pdfs/microstepexample.pdf")
+#     pdf_loader = PDFLoader()
+#     advanced_paragraph_chunk_strategy = AdvancedParagraphChunkStrategy()
+#     processor_paragraph = DocumentProcessor(
+#         loader=pdf_loader, chunk_strategy=advanced_paragraph_chunk_strategy
+#     )
+#     chunks = processor_paragraph.process_pdf(pdf_path)
+#
+#     logger.info(f"Number of chunks: {len(chunks)}")
+#     for i, chunk in enumerate(chunks):
+#         logger.info(f"--- Chunk {i + 1} ---")
+#         logger.info(chunk)
+#
+#     documents = [chunk.text for chunk in chunks]
+#     metadatas = [
+#         {
+#             k: v
+#             for k, v in {
+#                 "pdf_name": chunk.pdf_name,
+#                 "pdf_page": chunk.pdf_page,
+#                 "section_name": chunk.section_name,
+#                 "subsection_name": chunk.subsection_name,
+#                 "chunk_type": chunk.chunk_type,
+#             }.items()
+#             if v is not None
+#         }
+#         for chunk in chunks
+#     ]
+#     ids = [chunk.id for chunk in chunks]
+#
+#     vector_store = VectorStore(collection_name="local-rag")
+#     vector_store.create_vector_db(documents=documents, metadatas=metadatas, ids=ids)
+#
+#     embedding_strategy = EmbeddingsRetrievalStrategy(vector_store)
+#     keyphrase_strategy = KeyphraseRetrievalStrategy(chunks)
+#
+#     fusion_retriever = FusionRetrieval(
+#         strategies=[embedding_strategy, keyphrase_strategy],
+#         alpha=0.5,
+#         max_cosine_distance=1.6,
+#         combined_threshold=0.4,
+#     )
+#
+#     end_time = time.time()
+#     print(f"Time to create chunks: {end_time - start}")
+#
+#     new_start = time.time()
+#
+#     query = """What is the IMS AWOS User Interface about?"""
+#
+#     top_k = 7  # Maybe a bit more to make sure we get enough relevant chunks.
+#     fused_results = fusion_retriever.retrieve(query, top_k)
+#
+#     new_end = time.time()
+#     print(f"Time to retrieve: {new_end - new_start}")
+#
+#     chunk_dict = {chunk.id: chunk for chunk in chunks}
+#     logger.info("\n\n\nFused Retrieval Results:")
+#     for res in fused_results:
+#         logger.info(
+#             f"Chunk ID: {res.chunk_id} | Combined Score: {res.combined_score:.3f}"
+#         )
+#         logger.info(chunk_dict.get(res.chunk_id))
+#         logger.info("")
+#
+#     vector_store.delete_collection()
 
-    logger.info(f"Number of chunks: {len(chunks)}")
+
+import json
+import logging
+import time
+from pathlib import Path
+from typing import List
+
+# Import your modules/classes:
+# from your_module import PDFLoader, DocumentProcessor, AdvancedParagraphChunkStrategy
+# from your_module import VectorStore, EmbeddingsRetrievalStrategy, KeyphraseRetrievalStrategy, FusionRetrieval, Chunk
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+
+def load_chunks_from_vector_store(vector_store: VectorStore) -> List[Chunk]:
+    """
+    Loads serialized chunk data from the vector store's metadata and rehydrates chunk objects.
+    """
+    logger.info("Loading chunks from existing vector DB metadata...")
+    result = vector_store.collection.get()
+    metadatas = result.get("metadatas", [])
+    documents = result.get("documents", [])
+    ids = result.get("ids", [])
+    loaded_chunks = []
+    for i, md in enumerate(metadatas):
+        if "chunk_data" in md:
+            try:
+                chunk_dict = json.loads(md["chunk_data"])
+                # Ensure consistency with current document text and id
+                chunk_dict.setdefault("text", documents[i])
+                chunk_dict.setdefault("id", ids[i])
+                chunk = Chunk.from_dict(chunk_dict)
+                loaded_chunks.append(chunk)
+            except Exception as e:
+                logger.error(f"Error loading chunk {i}: {e}")
+        else:
+            logger.warning(f"No chunk_data found in metadata for document {i}")
+    logger.info(f"Loaded {len(loaded_chunks)} chunks into memory.")
+    return loaded_chunks
+
+
+def create_vector_store_from_pdf(
+    pdf_path: Path, vector_store: VectorStore
+) -> List[Chunk]:
+    """
+    Processes the PDF, creates chunks, and populates the vector store with serialized chunk data.
+    Returns the list of chunks.
+    """
+    logger.info("Processing PDF to generate chunks...")
+    pdf_loader = PDFLoader()  # adjust if you need an image transcriber, etc.
+    chunk_strategy = AdvancedParagraphChunkStrategy()
+    processor = DocumentProcessor(loader=pdf_loader, chunk_strategy=chunk_strategy)
+    chunks = processor.process_pdf(pdf_path)
+    logger.info(f"Number of chunks generated: {len(chunks)}")
+
+    # Log chunks for debugging
     for i, chunk in enumerate(chunks):
         logger.info(f"--- Chunk {i + 1} ---")
         logger.info(chunk)
 
+    # Prepare documents and metadata (including serialized chunk data)
     documents = [chunk.text for chunk in chunks]
     metadatas = [
         {
-            k: v
-            for k, v in {
-                "pdf_name": chunk.pdf_name,
-                "pdf_page": chunk.pdf_page,
-                "section_name": chunk.section_name,
-                "subsection_name": chunk.subsection_name,
-                "chunk_type": chunk.chunk_type,
-            }.items()
-            if v is not None
+            "pdf_name": chunk.pdf_name or "",
+            "pdf_page": chunk.pdf_page or "",
+            "section_name": chunk.section_name or "",
+            "subsection_name": chunk.subsection_name or "",
+            "chunk_type": chunk.chunk_type or "",
+            "chunk_data": json.dumps(chunk.to_dict()),
         }
         for chunk in chunks
     ]
+
     ids = [chunk.id for chunk in chunks]
 
-    vector_store = VectorStore(collection_name="local-rag")
     vector_store.create_vector_db(documents=documents, metadatas=metadatas, ids=ids)
+    logger.info("Vector DB created with chunk data.")
+    return chunks
 
+
+def main():
+    start = time.time()
+    pdf_path = Path("../../data/pdfs/microstepexample.pdf")
+    vector_store = VectorStore(collection_name="local-rag")
+
+    # First, check if the vector store already exists
+    if vector_store.collection_exists():
+        logger.info("Vector store already exists. Attempting to load chunks from DB.")
+        chunks = load_chunks_from_vector_store(vector_store)
+        # If no chunks are loaded, fall back to reprocessing the PDF.
+        if not chunks:
+            logger.warning(
+                "No chunk data found in DB; reprocessing PDF to generate chunks."
+            )
+            chunks = create_vector_store_from_pdf(pdf_path, vector_store)
+    else:
+        logger.info("Vector store does not exist. Processing PDF to generate chunks.")
+        chunks = create_vector_store_from_pdf(pdf_path, vector_store)
+
+    # Build retrieval strategies using the (re)loaded chunks
     embedding_strategy = EmbeddingsRetrievalStrategy(vector_store)
     keyphrase_strategy = KeyphraseRetrievalStrategy(chunks)
 
@@ -212,21 +353,20 @@ if __name__ == "__main__":
         combined_threshold=0.4,
     )
 
-    end_time = time.time()
-    print(f"Time to create chunks: {end_time - start}")
+    end = time.time()
+    logger.info(f"Setup completed in {end - start:.2f} seconds.")
 
+    # Now run a query (this should be fast if the vector store is populated)
+    query = "What is the IMS AWOS User Interface about?"
+    top_k = 7  # Retrieve a few relevant chunks
     new_start = time.time()
-
-    query = """What is the IMS AWOS User Interface about?"""
-
-    top_k = 7  # Maybe a bit more to make sure we get enough relevant chunks.
     fused_results = fusion_retriever.retrieve(query, top_k)
-
     new_end = time.time()
-    print(f"Time to retrieve: {new_end - new_start}")
+    logger.info(f"Time to retrieve: {new_end - new_start:.2f} seconds.")
 
+    # Display results (mapping chunk IDs to chunk objects for clarity)
     chunk_dict = {chunk.id: chunk for chunk in chunks}
-    logger.info("\n\n\nFused Retrieval Results:")
+    logger.info("Fused Retrieval Results:")
     for res in fused_results:
         logger.info(
             f"Chunk ID: {res.chunk_id} | Combined Score: {res.combined_score:.3f}"
@@ -234,4 +374,9 @@ if __name__ == "__main__":
         logger.info(chunk_dict.get(res.chunk_id))
         logger.info("")
 
-    vector_store.delete_collection()
+    # Do not delete the collection if you want persistence:
+    # vector_store.delete_collection()
+
+
+if __name__ == "__main__":
+    main()
