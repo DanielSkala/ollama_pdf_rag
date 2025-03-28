@@ -1,0 +1,1 @@
+[image]: Login screen for IMS Alerts, featuring fields for username and password. It includes prompts for user input and buttons for submitting the login information or hiding the interface.

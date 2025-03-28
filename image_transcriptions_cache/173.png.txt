@@ -1,0 +1,1 @@
+[image]: A computer dialog box displaying an alert message. It shows a timestamp of 17.06.2015 13:32:46 UTC and contains a high-priority test alert indicating that a sound is triggered on two lines, with an "OK" button for acknowledgment.

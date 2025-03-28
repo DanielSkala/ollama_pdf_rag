@@ -22,7 +22,7 @@ from src.core.retrieval.fusion_retrieval import FusionRetrieval
 from src.core.retrieval.keyphrases_strategy import KeyphraseRetrievalStrategy
 from src.core.retrieval.vector_store import VectorStore
 
-ENV_VARS = dotenv_values("../../.env.local")
+ENV_VARS = dotenv_values(".env.local")
 OPENAI_API_KEY = ENV_VARS["OPENAI_API_KEY"]
 
 logging.basicConfig(level=logging.INFO)
@@ -180,16 +180,6 @@ class RAG:
             self._initialize_system()
 
     def _retrieve(self, query: str, top_k: int = 7) -> List[Any]:
-        """
-        Expands the query and retrieves relevant document chunks.
-
-        Args:
-            query (str): The user's query.
-            top_k (int): Number of top chunks to retrieve.
-
-        Returns:
-            List: A list of retrieval results.
-        """
         logger.info("Expanding query...")
         expanded_query = self.query_expansion_module.expand_query(query)
         logger.info(f"Expanded query: {expanded_query}")
@@ -246,7 +236,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     # Setup configuration and credentials
-    MODEL = "gpt-4o-mini"  # Or "llama3.2" if using Ollama
+    MODEL = "gpt-4o"  # Or "llama3.2" if using Ollama
 
     # Initialize the image transcriber (used by the PDFLoader)
     image_transcriber = ImageTranscriber(openai_api_key=OPENAI_API_KEY, model=MODEL)

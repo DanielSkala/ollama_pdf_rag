@@ -1,0 +1,1 @@
+[image]: The image displays a user interface for managing weather phenomena data, featuring options to select intervals, log direction, and specific sites. It includes a table showing recorded weather events, such as rain, with columns for timing, visibility, wind gusts, and associated codes. There are buttons for loading data and starting a new entry.

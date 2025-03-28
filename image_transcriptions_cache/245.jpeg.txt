@@ -1,0 +1,1 @@
+[image]: Dashboard displaying meteorological data including wind summary, temperature, humidity, pressure, and precipitation information. The interface includes sections for instantaneous values and specific settings related to measurement units and site configuration.

@@ -1,0 +1,1 @@
+[image]: Confirmation dialogue box asking if the user really wants to set a runway to "Occupied," with options to confirm (Yes) or cancel.

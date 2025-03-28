@@ -84,18 +84,14 @@ ollama_pdf_rag/
 
 #### Option 1: Streamlit Interface
 ```bash
-python run.py
+streamlit run /Users/daskala/Desktop/Slido/ollama_pdf_rag/src/core/chatbot_demo.py
 ```
 Then open your browser to `http://localhost:8501`
 
 ![Streamlit UI](st_app_ui.png)
 *Streamlit interface showing PDF viewer and chat functionality*
 
-#### Option 2: Jupyter Notebook
-```bash
-jupyter notebook
-```
-Open `updated_rag_notebook.ipynb` to experiment with the code
+
 
 ## 💡 Usage Tips
 

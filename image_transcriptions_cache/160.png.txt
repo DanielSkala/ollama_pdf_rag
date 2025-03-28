@@ -1,0 +1,1 @@
+[image]: A notification window displaying an alert message with a red error icon. It states the date and time along with a warning about "Too many alerts," the number of dropped alerts, and provides an option to "See log files." There is an "OK" button to acknowledge the alert.

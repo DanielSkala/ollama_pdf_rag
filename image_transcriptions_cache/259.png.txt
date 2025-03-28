@@ -1,0 +1,1 @@
+[image]: A detailed table displaying meteorological data for different runways, including parameters such as RVR (Runway Visual Range), relative humidity, and visibility metrics. Each column corresponds to specific runway positions with updated values for various measurements. The data is organized for easy comparison across different runways and conditions.

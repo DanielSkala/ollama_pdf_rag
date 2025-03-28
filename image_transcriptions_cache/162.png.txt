@@ -1,0 +1,1 @@
+[image]: Alert notification indicating that the server has stopped responding, with a timestamp of June 17, 2015, at 10:34:20 UTC and an "OK" button for acknowledgment.

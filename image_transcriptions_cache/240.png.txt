@@ -1,0 +1,1 @@
+[image]: Screenshot of the MicroStep-MIS interface displaying observed meteorological data. It includes information on wind direction and speed, temperature, humidity, visibility, and cloud layers. Various sensors and their readings are organized in a structured layout for quick reference.

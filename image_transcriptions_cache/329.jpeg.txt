@@ -1,0 +1,1 @@
+[image]: A color picker interface displaying a gradient from black to red on the left side, with sliders for adjusting RGB values (R, G, B) as well as H (Hue), S (Saturation), and B (Brightness) on the right. Below the sliders, the hex code for the selected color is shown as "#fa0505".

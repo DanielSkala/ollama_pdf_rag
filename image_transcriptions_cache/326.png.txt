@@ -1,0 +1,1 @@
+[image]: List of meteorological parameters such as dew point, pressure, humidity, and temperature, associated with different runway identifiers (RWY 02, RWY 20). The image appears to provide options for visibility settings and includes references to additional data sources like OpenStreetMap.

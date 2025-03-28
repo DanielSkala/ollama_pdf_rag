@@ -1,0 +1,1 @@
+[image]: A settings panel displaying relative humidity levels with corresponding color indicators: green for 0%, orange for 80%, and red for 90%. It includes buttons to "Reset defaults" and "Close."

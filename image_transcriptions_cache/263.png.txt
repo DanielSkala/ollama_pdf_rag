@@ -1,0 +1,1 @@
+[image]: A dialog box displaying the message "Insufficient privileges, please login." with an "OK" button for user interaction.

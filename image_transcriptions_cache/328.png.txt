@@ -1,0 +1,1 @@
+[image]: Interface element showing options for background settings in MicroStep-MIS, including checkboxes for visibility and a color selection box highlighted in red.

@@ -1,0 +1,1 @@
+[image]: The image displays a weather monitoring dashboard for runway RWY 02, showcasing sky conditions and instant data such as cloud base and visibility measurements. It includes a graph illustrating cloud base and vertical visibility trends over a specified time period.

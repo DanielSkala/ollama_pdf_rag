@@ -1,0 +1,1 @@
+[image]: Screenshot displaying pressure data for Runway 02, including values for QNH, QFE, and QFF in hPa, with options to view in different units (hPa, inHg, mmHg).

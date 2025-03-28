@@ -1,0 +1,1 @@
+[image]: List of various sensors and their status indicators, including AWS, RVR, CEILO, and ENVIRO devices, each identified by a specific code, with color-coded status indicators corresponding to their performance.

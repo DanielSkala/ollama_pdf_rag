@@ -1,15 +1,14 @@
-"""LLM configuration and setup."""
-
 import logging
 
 from dotenv import dotenv_values
 from langchain_ollama.chat_models import ChatOllama
 from openai import OpenAI
 
-logger = logging.getLogger(__name__)
-ENV_VARS = dotenv_values("../../.env.local")
+ENV_VARS = dotenv_values(".env.local")
 OPENAI_API_KEY = ENV_VARS["OPENAI_API_KEY"]
 MODEL = "gpt-4o-mini"
+
+logger = logging.getLogger(__name__)
 
 
 class LLMManager:

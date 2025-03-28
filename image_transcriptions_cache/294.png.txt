@@ -1,0 +1,1 @@
+[image]: Screenshot displaying a manual input interface for Wind Direction Summary Magnetic, including fields for instantaneous values, average values, and data from recent time intervals. The interface also includes options to activate, deactivate, or cancel the input.

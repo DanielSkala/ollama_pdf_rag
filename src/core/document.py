@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 nlp = spacy.load("en_core_web_sm")
 
-ENV_VARS = dotenv_values("../../.env.local")
+ENV_VARS = dotenv_values(".env.local")
 OPENAI_API_KEY = ENV_VARS["OPENAI_API_KEY"]
 MODEL = "gpt-4o-mini"
 
@@ -205,6 +205,7 @@ class ChunkingStrategy(ABC):
                 page_for_chunk = page_num
             else:
                 break
+        # FIXME: Fix the +1 in page
         return page_for_chunk + 1 if page_for_chunk is not None else 0
 
 

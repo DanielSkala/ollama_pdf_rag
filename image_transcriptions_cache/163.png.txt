@@ -1,0 +1,1 @@
+[image]: A notification alert indicating that the server started responding, with a timestamp of 17.06.2015 10:35:37 UTC. The alert includes an information icon and an "OK" button to acknowledge the message.

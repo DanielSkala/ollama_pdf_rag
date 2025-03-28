@@ -1,0 +1,1 @@
+[image]: Screenshot showing a pressure measurement table for runway 02, indicating values for QNH, QFE, and QFF in hectopascals (hPa). The table allows selection between different pressure units (hPa, inHg, mmHg) and includes an edit option.

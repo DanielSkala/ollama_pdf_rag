@@ -1,0 +1,1 @@
+[image]: A settings panel showing options for relative humidity with values of 0%, 80%, and 90%. A color selector is displayed, indicating a selected color at the top, with RGB values listed below.

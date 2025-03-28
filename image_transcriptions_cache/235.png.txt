@@ -1,0 +1,1 @@
+[image]: The image displays a weather data table with columns for TDZ, MID, and END sections, including parameters like visibility (VIS), cloud base (CLD BASE), temperature (T), dew point (DP), relative humidity (RH), and current weather conditions. It also includes atmospheric pressure readings (QNH and QFE), along with sunrise (SR) and sunset (SS) times, and cloud direction.

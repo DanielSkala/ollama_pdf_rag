@@ -1,0 +1,1 @@
+[image]: Dashboard displaying real-time meteorological data for an airport. It includes readings for temperature, humidity, dew point, and pressure across different runways, alongside a map overview of the airport layout. Various communication channels and sensor statuses are also indicated on the interface.

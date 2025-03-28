@@ -1,0 +1,1 @@
+[image]: The image shows a user interface for the MicroStep-MIS system, displaying a section titled "Term." It includes fields for entering message type, date, and time in UTC, along with a warning section. Additionally, it contains settings for automatic coding, allowing users to enable coding options and set time parameters.

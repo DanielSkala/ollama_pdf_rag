@@ -1,0 +1,1 @@
+[image]: Table displaying RVR (Runway Visual Range) data for METAR, comparing RWY 19 TDZ and RWY 01 TDZ, with values for day and night conditions including visibility and relative humidity percentages.

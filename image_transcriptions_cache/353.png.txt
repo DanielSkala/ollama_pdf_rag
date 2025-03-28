@@ -1,0 +1,1 @@
+[image]: A dialog box asking for confirmation to delete an item, featuring the message "Really delete?" along with two buttons labeled "OK" and "Cancel."

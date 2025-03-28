@@ -1,0 +1,1 @@
+[image]: A calendar interface displaying the month of April 2024, with days organized in a grid format. The current date options and action buttons for "Today" and "Close" are also visible at the bottom.

@@ -1,0 +1,1 @@
+[image]: Dashboard displaying real-time data for three different runways (RWY 19, MID, RWY 01), including parameters such as RVR (Runway Visual Range), P (Pressure), BL (Brightness Level), and MOR (Minimum Operational Range). Each runway has corresponding graphical representations of RVR and MOR measurements over time.

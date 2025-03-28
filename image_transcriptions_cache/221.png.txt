@@ -1,0 +1,1 @@
+[image]: Gauge displaying a measurement scale from 30 to 36, highlighted by a yellow arc with a red arrow indicating the current value, which appears to be closer to 33.

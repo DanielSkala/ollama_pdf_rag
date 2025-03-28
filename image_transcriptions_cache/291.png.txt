@@ -1,0 +1,1 @@
+[image]: Data display showing instrument readings with values for immediate, 2-minute, and 10-minute intervals, including measurements of 290, 280, and 280, alongside corresponding numbers of 19.4 and 23.3.

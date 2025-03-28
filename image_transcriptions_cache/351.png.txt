@@ -1,0 +1,1 @@
+[image]: Table displaying weather observation records, including details such as name, start and end times, visibility, wind gusts, and relevant codes. The data entries report occurrences of 'Rain' and 'Drizzle' with associated timestamps and metrics.

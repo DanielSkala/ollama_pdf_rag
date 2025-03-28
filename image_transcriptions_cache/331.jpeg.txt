@@ -1,0 +1,1 @@
+[image]: The image displays a network topology diagram featuring an airport layout with a highlighted runway labeled "RWY 17" and a point labeled "MID." A sidebar lists communication channels and connected IP addresses, suggesting a monitoring or communication system for air traffic management.

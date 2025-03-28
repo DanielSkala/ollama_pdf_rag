@@ -1,0 +1,1 @@
+[image]: Screenshot of the MicroStep-MIS interface displaying various options such as "Contact us," "Data Query," and "Operational Alerts." The status indicates "Not logged" and the current version at the bottom is noted as "4.1 TW 20220706."

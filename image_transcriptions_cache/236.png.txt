@@ -1,0 +1,1 @@
+[image]: Screenshot displaying a METAR report, detailing weather conditions including wind, visibility, runway status, and temperature. It features various tabs for related information like TAF, Snowtam, and ATIS.

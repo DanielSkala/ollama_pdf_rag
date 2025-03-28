@@ -1,0 +1,1 @@
+[image]: Screenshot of the IMS Alerts interface displaying settings for roles, message buffer, audio preferences, alert reminders, appearance options, and printer configuration. It includes fields for user language, notification settings, and server information.

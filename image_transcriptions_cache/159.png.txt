@@ -1,0 +1,1 @@
+[image]: Alert window displaying a timestamp, a code related to a METAR alert, and a prompt to create an "FM 15 METAR" report, with an "OK" button to acknowledge the alert.
